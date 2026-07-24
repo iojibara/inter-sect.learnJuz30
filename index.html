@@ -192,6 +192,9 @@ main{max-width:1100px;margin:0 auto;padding:1.5rem 1.25rem 5rem;}
 #rrmodal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto;}
 #rrmodal.open{display:flex;}
 .rr-disclaimer{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:.7rem .9rem;font-size:.82rem;color:var(--muted);line-height:1.5;margin-bottom:1rem;}
+.rr-recite-block{background:var(--sur2);border:1.5px solid var(--gold);border-radius:10px;padding:1rem 1.2rem;margin-bottom:1rem;}
+.rr-recite-block .aar{margin:0;}
+.rr-recite-block .aen{margin:.5rem 0 0;}
 .rr-record-row{display:flex;flex-direction:column;align-items:center;gap:.6rem;padding:.6rem 0 1rem;}
 .rr-record-btn{padding:.8rem 1.6rem;border-radius:50px;border:2px solid var(--red);background:transparent;color:#e08070;font-size:1rem;cursor:pointer;transition:all .15s;font-family:'Georgia',serif;}
 .rr-record-btn:hover{background:var(--red);color:#fff;}
@@ -802,7 +805,7 @@ function openRR(sId,ayahN){
   const a=s.ayahs.find(x=>x.n===ayahN);
   if(!a)return;
   if(curAudio){curAudio.pause();if(curCard){curCard.classList.remove('playing');const b=curCard.querySelector('.abplay');if(b){b.classList.remove('on');b.textContent='▶ Play';}}curAudio=null;curCard=null;}
-  rrState={sId,ayahN,mediaRecorder:null,chunks:[],studentBlob:null,studentUrl:null,recording:false,busy:false,stream:null,audioCtx:null};
+  rrState={sId,ayahN,arText:a.ar,enText:a.en,mediaRecorder:null,chunks:[],studentBlob:null,studentUrl:null,recording:false,busy:false,stream:null,audioCtx:null};
   document.getElementById('rrm-title').textContent=`Record & Rate — ${s.name} ${sId}:${ayahN}`;
   rrRender();
   document.getElementById('rrmodal').classList.add('open');
@@ -820,11 +823,14 @@ document.getElementById('rrmodal').onclick=function(e){if(e.target===this)closeR
 
 function rrRender(){
   const box=document.getElementById('rrm-content');
-  let html;
+  let html=`<div class="rr-recite-block">
+    <div class="aar">${rrState.arText}</div>
+    <div class="aen">${rrState.enText}</div>
+  </div>`;
   if(TAJWEED_API_BASE){
-    html=`<p class="rr-disclaimer">🎯 Connected to the tajweed assessment service — this checks real per-rule tajweed correctness (madd length, qalqalah, etc.), not just timing. Some rules (ghunnah, idghaam, ikhfa, tafkheem) aren't implemented server-side yet and are scored as baseline/timing-only for now.</p>`;
+    html+=`<p class="rr-disclaimer">🎯 Connected to the tajweed assessment service — this checks real per-rule tajweed correctness (madd length, qalqalah, etc.), not just timing. Some rules (ghunnah, idghaam, ikhfa, tafkheem) aren't implemented server-side yet and are scored as baseline/timing-only for now.</p>`;
   }else{
-    html=`<p class="rr-disclaimer">🧪 <strong>Experimental:</strong> this compares the <em>rhythm and timing</em> of your recitation against Sheikh Al-Hussary's using on-device signal processing — it does not verify individual tajweed rules (madd length, qalqalah, ghunnah, etc.). Treat it as practice feedback, not a certified assessment.</p>`;
+    html+=`<p class="rr-disclaimer">🧪 <strong>Experimental:</strong> this compares the <em>rhythm and timing</em> of your recitation against Sheikh Al-Hussary's using on-device signal processing — it does not verify individual tajweed rules (madd length, qalqalah, ghunnah, etc.). Treat it as practice feedback, not a certified assessment.</p>`;
   }
   html+='<div class="rr-record-row">';
   if(!rrState.studentBlob){
@@ -1052,6 +1058,17 @@ async function rrCompareViaAPI(){
 
 function rrRenderApiResults(data){
   const report=data.report;
+
+  if(data.content_plausible===false){
+    document.getElementById('rr-results').innerHTML=`
+      <div class="rr-disclaimer" style="border-color:#e05840;background:#e0584015;color:#f0a898">
+        ⚠ <strong>This recording doesn't acoustically resemble the expected ayah closely enough to assess.</strong><br>
+        Check that you recited <em>this</em> ayah, in a quiet space, close to the mic, then try again.<br>
+        <span style="opacity:.7;font-size:.85em">(content match signal: ${data.content_match_quality})</span>
+      </div>`;
+    return;
+  }
+
   const overall=report.overall_score;
   const scoreColor=overall>=80?'#4cb880':overall>=60?'#e8a520':'#e05840';
   let html=`<div class="rr-score-badge" style="border-color:${scoreColor};color:${scoreColor}">
